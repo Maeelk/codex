@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Emoji Platformer</title>
+<style>
+  body, html { margin:0; padding:0; overflow:hidden; background:#222; color:white; font-family:sans-serif; }
+  canvas { display:block; background:#333; margin:0 auto; }
+</style>
+</head>
+<body>
+<canvas id="game" width="800" height="400"></canvas>
+<script>
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+const W = canvas.width;
+const H = canvas.height;
+
+const gravity = 0.5;
+let keys = {};
+
+document.addEventListener('keydown', e => keys[e.key] = true);
+document.addEventListener('keyup', e => keys[e.key] = false);
+
+class Entity {
+  constructor(x,y,w,h,emoji){
+    this.x=x; this.y=y; this.w=w; this.h=h; this.emoji=emoji;
+    this.vx=0; this.vy=0;
+    this.onGround=false;
+  }
+  draw(){ ctx.font = this.h+"px serif"; ctx.fillText(this.emoji,this.x,this.y+this.h); }
+  update(){
+    this.vy += gravity;
+    this.x += this.vx;
+    this.y += this.vy;
+  }
+}
+
+class Platform {
+  constructor(x,y,w,h){ this.x=x; this.y=y; this.w=w; this.h=h; }
+  draw(){ ctx.fillStyle='#654'; ctx.fillRect(this.x,this.y,this.w,this.h); }
+}
+
+class Surprise {
+  constructor(x,y){ this.x=x; this.y=y; this.size=24; this.active=true; }
+  draw(){ if(this.active){ctx.font=this.size+'px serif'; ctx.fillText('❓', this.x, this.y+this.size);} }
+  trigger(player){ if(!this.active) return; this.active=false; const r=Math.random();
+    if(r < 0.25){ player.vy = -15; } // big jump
+    else if(r < 0.5){ gravity *= -1; } // flip gravity
+    else if(r < 0.75){ player.vx += (Math.random()<0.5?-5:5); } // dash
+    else { platforms.push(new Platform(player.x, player.y+player.h, 60, 10)); } // create platform
+  }
+}
+
+let player = new Entity(50,300,24,24,'😺');
+let platforms = [];
+let surprises = [];
+
+function generate(){
+  let x=0;
+  while(x < 2000){
+    let w=80+Math.random()*120;
+    let h=10;
+    let y=200+Math.random()*150;
+    platforms.push(new Platform(x,y,w,h));
+    if(Math.random()<0.3) surprises.push(new Surprise(x+w/2,y-30));
+    x += w + Math.random()*100;
+  }
+}
+
+generate();
+
+function loop(){
+  requestAnimationFrame(loop);
+  ctx.clearRect(0,0,W,H);
+
+  // camera
+  ctx.save();
+  ctx.translate(-player.x+100,0);
+
+  // update player
+  player.update();
+  platforms.forEach(p=>{
+    // simple aabb collision
+    if(player.x < p.x + p.w && player.x + player.w > p.x &&
+       player.y < p.y + p.h && player.y + player.h > p.y && player.vy >=0){
+        player.y = p.y - player.h;
+        player.vy = 0;
+        player.onGround = true;
+    }
+  });
+  surprises.forEach(s=>{
+    if(s.active && player.x < s.x + s.size && player.x + player.w > s.x &&
+       player.y < s.y + s.size && player.y + player.h > s.y){ s.trigger(player); }
+  });
+  if(keys['ArrowLeft']) player.vx = -4; else if(keys['ArrowRight']) player.vx = 4; else player.vx*=0.8;
+  if(keys['ArrowUp'] && player.onGround){ player.vy = -12 * Math.sign(gravity); player.onGround=false; }
+  player.draw();
+
+  // draw platforms and surprises
+  platforms.forEach(p=> p.draw());
+  surprises.forEach(s=> s.draw());
+
+  ctx.restore();
+}
+loop();
+</script>
+</body>
+</html>
